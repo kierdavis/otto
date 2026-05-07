@@ -1,0 +1,11 @@
+[package]
+name = "otto"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitvec = "1.0.1"
+crossbeam = "0.8.4"
+crossterm = "0.29.0"
+enum-map = "2.7.3"
+enum_ext = "0.6.0"

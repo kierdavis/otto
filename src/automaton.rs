@@ -207,7 +207,7 @@ mod tests {
   };
 
   // Pattern designed by this deleted Reddit user:
-  // https://www.reddit.com/r/otomata/comments/lrd7n4/comment/gon0dfu/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+  // https://www.reddit.com/r/otomata/comments/lrd7n4/comment/gon0dfu/
   #[test]
   fn test_pattern() {
     let st = State::new(

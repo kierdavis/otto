@@ -19,6 +19,10 @@ impl ZoneMap {
     ))
   }
 
+  pub fn clear(&mut self) {
+    self.0.fill(|_, _| None);
+  }
+
   pub fn set(&mut self, rect: Rect, zone: Zone) {
     for y in rect.top()..rect.bottom() {
       for x in rect.left()..rect.right() {

@@ -219,6 +219,9 @@ impl<'a, 'b> UI<'a, 'b> {
       .root
       .place(screen_rect, &mut self.mouse_map)
       .is_some();
+    if !self.place_ok {
+      self.mouse_map.clear();
+    }
 
     self.canvas.clear();
     if self.place_ok {

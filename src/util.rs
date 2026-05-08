@@ -33,6 +33,12 @@ impl<T> Matrix<T> {
       .enumerate()
       .map(|(idx, val)| ((idx % self.width, idx / self.width), val))
   }
+
+  pub fn fill(&mut self, mut f: impl FnMut(usize, usize) -> T) {
+    for (i, cell) in self.data.iter_mut().enumerate() {
+      *cell = f(i % self.width, i / self.width);
+    }
+  }
 }
 
 impl<T> Index<(usize, usize)> for Matrix<T> {

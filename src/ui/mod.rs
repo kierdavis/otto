@@ -65,13 +65,14 @@ fn main2<'a, 'b>(canvas: &'a mut Canvas<'b>) {
     .set(datamodel_changes_sender)
     .expect("ui::main called more than once");
   let (pending_flush_sender, pending_flush_receiver) = channel::bounded(1);
+  let screen_size = crossterm::terminal::size()
+    .expect("failed to read screen size")
+    .into();
   (UI {
     canvas,
     components: Components::build(),
-    screen_size: crossterm::terminal::size()
-      .expect("failed to read screen size")
-      .into(),
-    mouse_map: mouse::ZoneMap::new(Xy::ZERO),
+    screen_size,
+    mouse_map: mouse::ZoneMap::new(screen_size),
     place_ok: false,
     terminal_events: receive_events(),
     datamodel_changes,
@@ -136,6 +137,7 @@ impl<'a, 'b> UI<'a, 'b> {
     match event {
       Resize(x, y) => {
         self.screen_size = Xy { x, y };
+        self.mouse_map = mouse::ZoneMap::new(self.screen_size);
         self.place_and_paint_all();
         Continue(())
       }
@@ -213,7 +215,7 @@ impl<'a, 'b> UI<'a, 'b> {
       top_left: Xy::ZERO,
       size: self.screen_size,
     };
-    self.mouse_map = mouse::ZoneMap::new(self.screen_size);
+    self.mouse_map.clear();
     self.place_ok = self
       .components
       .root

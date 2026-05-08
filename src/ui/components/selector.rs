@@ -1,4 +1,3 @@
-use crate::datamodel::View;
 use crate::ui::canvas::Canvas;
 use crate::ui::components::Component;
 use crate::ui::mouse;
@@ -18,12 +17,12 @@ pub trait Enum: std::fmt::Debug + Eq + Sized + 'static {
 }
 
 pub struct Selector<T: Enum> {
-  selected: View<T>,
+  selected: &'static dyn Fn() -> T,
   width: u16,
   origin: Cell<Option<Xy>>,
 }
 
-pub fn new<T: Enum>(selected: View<T>) -> Selector<T> {
+pub fn new<T: Enum>(selected: &'static dyn Fn() -> T) -> Selector<T> {
   Selector {
     selected,
     width: T::all()
@@ -72,7 +71,7 @@ impl<T: Enum> Component for Selector<T> {
   fn paint(&self, canvas: &mut Canvas) {
     if let Some(origin) = self.origin.get() {
       canvas.move_to(origin);
-      let selected = self.selected.get();
+      let selected = (self.selected)();
       for (i, variant) in T::all().iter().enumerate() {
         if i != 0 {
           canvas.write(SEP.val);

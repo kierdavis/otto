@@ -75,8 +75,8 @@ pub struct Components {
 impl Components {
   pub fn build() -> Self {
     let automaton = Rc::new(automaton::new());
-    let clock_indicator = Rc::new(bulb::new(datamodel::clock_indicator_lit()));
-    let clock_src_selector = Rc::new(selector::new(datamodel::clock_src()));
+    let clock_indicator = Rc::new(bulb::new(&datamodel::clock_indicator_lit));
+    let clock_src_selector = Rc::new(selector::new(&datamodel::clock_src));
     let root = Box::new(stack::new_vert(child_vec![
       void::vert(1),
       stack::new_hoz(child_vec![

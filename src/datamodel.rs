@@ -65,36 +65,18 @@ impl Change {
   }
 }
 
-pub struct View<T: 'static> {
-  getter: &'static dyn Fn() -> T,
+pub fn automaton_state() -> automaton::State {
+  AUTOMATON_STATE
+    .lock()
+    .expect("poisoned")
+    .get_or_insert_with(default_automaton_state)
+    .clone()
 }
 
-impl<T: 'static> View<T> {
-  pub fn get(&self) -> T {
-    (self.getter)()
-  }
+pub fn clock_indicator_lit() -> bool {
+  CLOCK_INDICATOR_LIT.load(Relaxed)
 }
 
-pub fn automaton_state() -> View<automaton::State> {
-  View {
-    getter: &|| {
-      AUTOMATON_STATE
-        .lock()
-        .expect("poisoned")
-        .get_or_insert_with(default_automaton_state)
-        .clone()
-    },
-  }
-}
-
-pub fn clock_indicator_lit() -> View<bool> {
-  View {
-    getter: &|| CLOCK_INDICATOR_LIT.load(Relaxed),
-  }
-}
-
-pub fn clock_src() -> View<ClockSrc> {
-  View {
-    getter: &|| ClockSrc::from_ordinal(CLOCK_SRC.load(Relaxed)).unwrap(),
-  }
+pub fn clock_src() -> ClockSrc {
+  ClockSrc::from_ordinal(CLOCK_SRC.load(Relaxed)).unwrap()
 }

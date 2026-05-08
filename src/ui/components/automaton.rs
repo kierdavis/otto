@@ -17,7 +17,7 @@ pub fn new() -> Automaton {
 
 impl Component for Automaton {
   fn place(&self, available: Rect, mouse_map: &mut mouse::ZoneMap) -> Option<Xy> {
-    let state = datamodel::automaton_state().get();
+    let state = datamodel::automaton_state();
     let fixed_size = Xy {
       x: (state.width() * 4 + 1).try_into().unwrap(),
       y: (state.height() * 2 + 1).try_into().unwrap(),
@@ -33,7 +33,7 @@ impl Component for Automaton {
 
   fn paint(&self, canvas: &mut Canvas) {
     if let Some(origin) = self.origin.get() {
-      let state = datamodel::automaton_state().get();
+      let state = datamodel::automaton_state();
       assert!(state.width() > 0);
       assert!(state.height() > 0);
 

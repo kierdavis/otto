@@ -1,4 +1,3 @@
-use crate::datamodel::View;
 use crate::ui::canvas::Canvas;
 use crate::ui::components::Component;
 use crate::ui::mouse;
@@ -8,11 +7,11 @@ use std::cell::Cell;
 pub const WIDTH: u16 = 2;
 
 pub struct Bulb {
-  is_lit: View<bool>,
+  is_lit: &'static dyn Fn() -> bool,
   origin: Cell<Option<Xy>>,
 }
 
-pub fn new(is_lit: View<bool>) -> Bulb {
+pub fn new(is_lit: &'static dyn Fn() -> bool) -> Bulb {
   Bulb {
     is_lit,
     origin: Cell::new(None),
@@ -34,7 +33,7 @@ impl Component for Bulb {
   fn paint(&self, canvas: &mut Canvas) {
     if let Some(origin) = self.origin.get() {
       canvas.move_to(origin);
-      canvas.write(if self.is_lit.get() { "🔴" } else { "⚫" });
+      canvas.write(if (self.is_lit)() { "🔴" } else { "⚫" });
     }
   }
 }

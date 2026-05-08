@@ -13,7 +13,7 @@ pub fn main() {
     .expect("ui::main called more than once");
 
   let builtin_clock_bpm = 160;
-  let mut builtin_clock = match datamodel::clock_src().get() {
+  let mut builtin_clock = match datamodel::clock_src() {
     ClockSrc::Builtin => channel::tick(Duration::from_micros(60_000_000 / builtin_clock_bpm)),
     ClockSrc::Midi => channel::never(),
   };
@@ -28,7 +28,7 @@ pub fn main() {
           Change::AdvanceAutomatonState => {},
           Change::SetClockIndicatorLit(_) => {},
           Change::SetClockSrc(_) => {
-            builtin_clock = match datamodel::clock_src().get() {
+            builtin_clock = match datamodel::clock_src() {
               ClockSrc::Builtin => channel::tick(Duration::from_micros(60_000_000 / builtin_clock_bpm)),
               ClockSrc::Midi => channel::never(),
             };

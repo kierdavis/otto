@@ -64,9 +64,11 @@ impl State {
     }))
   }
 
+  /*
   pub fn empty(width: usize, height: usize) -> Self {
     Self::new(width, height, std::iter::empty())
   }
+  */
 
   pub fn width(&self) -> usize {
     self.0.matrix.width()
@@ -76,6 +78,7 @@ impl State {
     self.0.matrix.height()
   }
 
+  #[cfg(test)]
   pub fn gliders(&self) -> impl Iterator<Item = ((usize, usize), Heading)> {
     self.0.matrix.enumerate().flat_map(|(xy, &cell)| {
       cell

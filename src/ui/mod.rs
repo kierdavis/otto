@@ -64,6 +64,7 @@ fn main2<'a, 'b>(canvas: &'a mut Canvas<'b>) {
   DATAMODEL_CHANGES_SENDER
     .set(datamodel_changes_sender)
     .expect("ui::main called more than once");
+  let (pending_flush_sender, pending_flush_receiver) = channel::bounded(1);
   (UI {
     canvas,
     components: Components::build(),
@@ -75,6 +76,8 @@ fn main2<'a, 'b>(canvas: &'a mut Canvas<'b>) {
     terminal_events: receive_events(),
     datamodel_changes,
     clock_indicator_timeout: channel::never(),
+    pending_flush_sender,
+    pending_flush_receiver,
   })
   .run()
 }
@@ -88,6 +91,8 @@ struct UI<'a, 'b> {
   terminal_events: Receiver<Event>,
   datamodel_changes: Receiver<Change>,
   clock_indicator_timeout: Receiver<Instant>,
+  pending_flush_sender: Sender<()>,
+  pending_flush_receiver: Receiver<()>,
 }
 
 impl<'a, 'b> UI<'a, 'b> {
@@ -107,6 +112,10 @@ impl<'a, 'b> UI<'a, 'b> {
         recv(self.clock_indicator_timeout) -> result => {
           result.expect("clock_indicator_timeout channel closed");
           Change::SetClockIndicatorLit(false).apply();
+        }
+        recv(self.pending_flush_receiver) -> result => {
+          result.expect("pending_flush_sender dropped");
+          self.canvas.flush();
         }
       }
     }
@@ -195,7 +204,7 @@ impl<'a, 'b> UI<'a, 'b> {
           self.components.clock_src_selector.paint(self.canvas);
         }
       }
-      self.canvas.flush();
+      let _ = self.pending_flush_sender.try_send(());
     }
   }
 
@@ -218,7 +227,7 @@ impl<'a, 'b> UI<'a, 'b> {
       self.canvas.move_to(Xy::ZERO);
       self.canvas.write("window too small");
     }
-    self.canvas.flush();
+    let _ = self.pending_flush_sender.try_send(());
   }
 }
 

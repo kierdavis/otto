@@ -16,7 +16,6 @@ use crossterm::event::Event;
 use std::ops::ControlFlow::{self, Break, Continue};
 use std::sync::OnceLock;
 use std::thread;
-use std::time::{Duration, Instant};
 
 pub fn main() {
   use crossterm::{execute, terminal};
@@ -76,7 +75,6 @@ fn main2<'a, 'b>(canvas: &'a mut Canvas<'b>) {
     place_ok: false,
     terminal_events: receive_events(),
     datamodel_changes,
-    clock_indicator_timeout: channel::never(),
     pending_flush_sender,
     pending_flush_receiver,
   })
@@ -91,7 +89,6 @@ struct UI<'a, 'b> {
   place_ok: bool,
   terminal_events: Receiver<Event>,
   datamodel_changes: Receiver<Change>,
-  clock_indicator_timeout: Receiver<Instant>,
   pending_flush_sender: Sender<()>,
   pending_flush_receiver: Receiver<()>,
 }
@@ -109,10 +106,6 @@ impl<'a, 'b> UI<'a, 'b> {
         }
         recv(self.datamodel_changes) -> result => {
           self.on_datamodel_change(result.expect("DATAMODEL_CHANGES_SENDER dropped"));
-        }
-        recv(self.clock_indicator_timeout) -> result => {
-          result.expect("clock_indicator_timeout channel closed");
-          Change::SetClockIndicatorLit(false).apply();
         }
         recv(self.pending_flush_receiver) -> result => {
           result.expect("pending_flush_sender dropped");
@@ -187,23 +180,16 @@ impl<'a, 'b> UI<'a, 'b> {
   }
 
   fn on_datamodel_change(&mut self, change: Change) {
-    match change {
-      Change::SetClockIndicatorLit(true) => {
-        self.clock_indicator_timeout = channel::after(Duration::from_millis(150));
-      }
-      _ => {}
-    }
-
     if self.place_ok {
       match change {
         Change::AdvanceAutomatonState => {
           self.components.automaton.paint(self.canvas);
         }
-        Change::SetClockIndicatorLit(_) => {
-          self.components.clock_indicator.paint(self.canvas);
-        }
         Change::SetClockSrc(_) => {
           self.components.clock_src_selector.paint(self.canvas);
+        }
+        Change::ToggleClockIndicator => {
+          self.components.clock_indicator.paint(self.canvas);
         }
       }
       let _ = self.pending_flush_sender.try_send(());

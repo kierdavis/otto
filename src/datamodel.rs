@@ -40,8 +40,8 @@ fn default_automaton_state() -> automaton::State {
 #[must_use]
 pub enum Change {
   AdvanceAutomatonState,
-  SetClockIndicatorLit(bool),
   SetClockSrc(ClockSrc),
+  ToggleClockIndicator,
 }
 
 impl Change {
@@ -53,11 +53,11 @@ impl Change {
         let (new, _) = old.next();
         *option = Some(new);
       }
-      &Self::SetClockIndicatorLit(new) => {
-        CLOCK_INDICATOR_LIT.store(new, Relaxed);
-      }
       &Self::SetClockSrc(new) => {
         CLOCK_SRC.store(new.ordinal(), Relaxed);
+      }
+      &Self::ToggleClockIndicator => {
+        CLOCK_INDICATOR_LIT.fetch_not(Relaxed);
       }
     }
     crate::realtime::on_datamodel_change(self.clone());

@@ -186,6 +186,7 @@ impl<'a, 'b> UI<'a, 'b> {
           self.components.automaton.paint(self.canvas);
         }
         Change::SetClockSrc(_) => {
+          self.components.clock_indicator.paint(self.canvas);
           self.components.clock_src_selector.paint(self.canvas);
         }
         Change::ToggleClockIndicator => {

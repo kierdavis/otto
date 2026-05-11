@@ -54,7 +54,10 @@ impl Change {
         *option = Some(new);
       }
       &Self::SetClockSrc(new) => {
-        CLOCK_SRC.store(new.ordinal(), Relaxed);
+        let old = ClockSrc::from_ordinal(CLOCK_SRC.swap(new.ordinal(), Relaxed)).unwrap();
+        if new != old {
+          CLOCK_INDICATOR_LIT.store(false, Relaxed);
+        }
       }
       &Self::ToggleClockIndicator => {
         CLOCK_INDICATOR_LIT.fetch_not(Relaxed);

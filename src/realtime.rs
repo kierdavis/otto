@@ -1,11 +1,11 @@
 use crate::datamodel::{self, Change, ClockSrc};
 use crate::midi;
 use crossbeam::{
-  channel::{self, Sender},
+  channel::{self, Receiver, Sender},
   select,
 };
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub fn main() {
   let (datamodel_changes_sender, datamodel_changes) = channel::bounded(32);
@@ -38,41 +38,94 @@ pub fn main() {
     Pitch::from_midi(76),
   ]);
 
-  let builtin_clock_bpm = 140 * 2;
-  let mut builtin_clock = match datamodel::clock_src() {
-    ClockSrc::Builtin => channel::tick(Duration::from_micros(60_000_000 / builtin_clock_bpm)),
-    ClockSrc::Midi => channel::never(),
-  };
+  let mut clock = Clock::builtin(140);
 
   loop {
     select! {
-      recv(builtin_clock) -> _ => {
-        let old_state = datamodel::automaton_state();
-        let (_, bounces) = old_state.next();
-        for &bounce in bounces {
-          use crate::automaton::Heading::*;
-          let scale = match bounce.wall { PosX | NegX => &x_scale, PosY | NegY => &y_scale };
-          midi_iface.emit_note_off(scale.at(bounce.coord_along_wall));
-          midi_iface.emit_note_on(scale.at(bounce.coord_along_wall));
+      recv(clock.builtin_tick_channel().unwrap_or(&channel::never())) -> _ => {
+        let actions = clock.tick();
+        if actions.beat {
+          let old_state = datamodel::automaton_state();
+          let (_, bounces) = old_state.next();
+          for &bounce in bounces {
+            use crate::automaton::Heading::*;
+            let scale = match bounce.wall { PosX | NegX => &x_scale, PosY | NegY => &y_scale };
+            midi_iface.emit_note_off(scale.at(bounce.coord_along_wall));
+            midi_iface.emit_note_on(scale.at(bounce.coord_along_wall));
+          }
+          midi_iface.flush();
+          Change::AdvanceAutomatonState.apply();
+          // Precompute state for next clock.
+          datamodel::automaton_state().next();
         }
-        midi_iface.flush();
-        Change::AdvanceAutomatonState.apply();
-        Change::ToggleClockIndicator.apply();
-        // Precompute state for next clock.
-        datamodel::automaton_state().next();
+        if actions.toggle_indicator {
+          Change::ToggleClockIndicator.apply();
+        }
       }
       recv(datamodel_changes) -> change_result => {
         match change_result.expect("DATAMODEL_CHANGES_SENDER dropped") {
           Change::AdvanceAutomatonState => {},
           Change::SetClockSrc(_) => {
-            builtin_clock = match datamodel::clock_src() {
-              ClockSrc::Builtin => channel::tick(Duration::from_micros(60_000_000 / builtin_clock_bpm)),
-              ClockSrc::Midi => channel::never(),
+            clock = match datamodel::clock_src() {
+              ClockSrc::Builtin => Clock::builtin(140),
+              ClockSrc::Midi => Clock::midi(),
             };
           },
           Change::ToggleClockIndicator => {},
         }
       }
+    }
+  }
+}
+
+enum Clock {
+  Builtin {
+    ticker: Receiver<Instant>,
+    next_tick_is_beat: bool,
+  },
+  Midi {},
+}
+
+struct ClockTick {
+  beat: bool,
+  toggle_indicator: bool,
+}
+
+impl Clock {
+  fn builtin(bpm: u64) -> Self {
+    // Tick rate is 2x the bpm since that's how fast we need to toggle the UI clock indicator.
+    let tick_interval_us = (1_000_000 * 60 / 2) / bpm;
+    Self::Builtin {
+      ticker: channel::tick(Duration::from_micros(tick_interval_us)),
+      next_tick_is_beat: true,
+    }
+  }
+  fn midi() -> Self {
+    Self::Midi {}
+  }
+  fn builtin_tick_channel(&self) -> Option<&Receiver<Instant>> {
+    match *self {
+      Self::Builtin { ref ticker, .. } => Some(ticker),
+      Self::Midi { .. } => None,
+    }
+  }
+  fn tick(&mut self) -> ClockTick {
+    match *self {
+      Self::Builtin {
+        ticker: _,
+        ref mut next_tick_is_beat,
+      } => {
+        let result = ClockTick {
+          beat: *next_tick_is_beat,
+          toggle_indicator: true,
+        };
+        *next_tick_is_beat = !*next_tick_is_beat;
+        result
+      }
+      Self::Midi {} => ClockTick {
+        beat: false,
+        toggle_indicator: false,
+      },
     }
   }
 }

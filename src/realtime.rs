@@ -42,7 +42,7 @@ pub fn main() {
 
   loop {
     select! {
-      recv(clock.builtin_tick_channel().unwrap_or(&channel::never())) -> _ => {
+      recv(clock.tick_channel().unwrap_or(&channel::never())) -> _ => {
         let actions = clock.tick();
         if actions.beat {
           let old_state = datamodel::automaton_state();
@@ -78,10 +78,21 @@ pub fn main() {
   }
 }
 
+static DATAMODEL_CHANGES_SENDER: OnceLock<Sender<Change>> = OnceLock::new();
+
+pub fn on_datamodel_change(change: Change) {
+  DATAMODEL_CHANGES_SENDER
+    .get()
+    .expect("realtime::main hasn't been called yet")
+    .try_send(change)
+    .expect("realtime thread crashed");
+}
+
 enum Clock {
   Builtin {
     ticker: Receiver<Instant>,
-    next_tick_is_beat: bool,
+    beat_divider: ClockDivider,
+    toggle_indicator_divider: ClockDivider,
   },
   Midi {},
 }
@@ -97,13 +108,14 @@ impl Clock {
     let tick_interval_us = (1_000_000 * 60 / 2) / bpm;
     Self::Builtin {
       ticker: channel::tick(Duration::from_micros(tick_interval_us)),
-      next_tick_is_beat: true,
+      beat_divider: ClockDivider::new(2),
+      toggle_indicator_divider: ClockDivider::new(1),
     }
   }
   fn midi() -> Self {
     Self::Midi {}
   }
-  fn builtin_tick_channel(&self) -> Option<&Receiver<Instant>> {
+  fn tick_channel(&self) -> Option<&Receiver<Instant>> {
     match *self {
       Self::Builtin { ref ticker, .. } => Some(ticker),
       Self::Midi { .. } => None,
@@ -113,15 +125,12 @@ impl Clock {
     match *self {
       Self::Builtin {
         ticker: _,
-        ref mut next_tick_is_beat,
-      } => {
-        let result = ClockTick {
-          beat: *next_tick_is_beat,
-          toggle_indicator: true,
-        };
-        *next_tick_is_beat = !*next_tick_is_beat;
-        result
-      }
+        ref mut beat_divider,
+        ref mut toggle_indicator_divider,
+      } => ClockTick {
+        beat: beat_divider.tick(),
+        toggle_indicator: toggle_indicator_divider.tick(),
+      },
       Self::Midi {} => ClockTick {
         beat: false,
         toggle_indicator: false,
@@ -130,12 +139,18 @@ impl Clock {
   }
 }
 
-static DATAMODEL_CHANGES_SENDER: OnceLock<Sender<Change>> = OnceLock::new();
+struct ClockDivider {
+  divisor: usize,
+  pos: usize,
+}
 
-pub fn on_datamodel_change(change: Change) {
-  DATAMODEL_CHANGES_SENDER
-    .get()
-    .expect("realtime::main hasn't been called yet")
-    .try_send(change)
-    .expect("realtime thread crashed");
+impl ClockDivider {
+  fn new(divisor: usize) -> Self {
+    Self { divisor, pos: 0 }
+  }
+  fn tick(&mut self) -> bool {
+    let result = self.pos == 0;
+    self.pos = (self.pos + 1) % self.divisor;
+    result
+  }
 }

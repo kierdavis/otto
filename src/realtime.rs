@@ -83,13 +83,28 @@ impl Realtime {
   }
 
   fn main_loop_midi_clock(&mut self) {
+    let ticks_per_beat = 24; // standard
+    let mut beat_divider = ClockDivider::new(ticks_per_beat);
+    let mut toggle_indicator_divider = ClockDivider::new(ticks_per_beat / 2);
+
     loop {
-      match self.service_one_idle_task() {
-        NothingToService => {
-          sleep(MAX_BASE_TICK_INTERVAL);
+      match self.midi_iface.try_recv() {
+        Some(midi::Event::Clock) => {
+          // Tick occurs now.
+          if beat_divider.tick() {
+            self.beat();
+          }
+          if toggle_indicator_divider.tick() {
+            Change::ToggleClockIndicator.apply();
+          }
         }
-        ConsumedTime => {}
-        RestartMainLoop => return,
+        None => match self.service_one_idle_task() {
+          NothingToService => {
+            sleep(MAX_BASE_TICK_INTERVAL);
+          }
+          ConsumedTime => {}
+          RestartMainLoop => return,
+        },
       }
     }
   }
@@ -112,7 +127,7 @@ impl Realtime {
     NothingToService
   }
 
-  fn beat(&mut self) {
+  fn beat(&self) {
     use crate::music_theory::{Pitch, Scale};
     let x_scale = Scale([
       Pitch::from_midi(38),
@@ -145,12 +160,9 @@ impl Realtime {
         PosX | NegX => &x_scale,
         PosY | NegY => &y_scale,
       };
-      self
-        .midi_iface
-        .emit_note_off(scale.at(bounce.coord_along_wall));
-      self
-        .midi_iface
-        .emit_note_on(scale.at(bounce.coord_along_wall));
+      let pitch = scale.at(bounce.coord_along_wall);
+      self.midi_iface.send_note_off(pitch);
+      self.midi_iface.send_note_on(pitch);
     }
     self.midi_iface.flush();
     Change::AdvanceAutomatonState.apply();
